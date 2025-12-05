@@ -13,15 +13,9 @@ type intRange struct {
 }
 type rangeList []intRange
 
-func (thiz *intRange) sizeOfOverlapWith(o intRange) uint64 {
-	if thiz.end < o.start || o.end < thiz.start {
-		return 0
-	}
-	return min(thiz.end, o.end) - min(thiz.start, o.start) + 1
-}
-
-func (thiz *intRange) isAdjacentTo(o intRange) bool {
-	return thiz.end+1 == o.start || o.end+1 == thiz.start
+func (thiz *intRange) overlapsWithOrIsAdjacentTo(o intRange) bool {
+	return thiz.end >= o.start && o.end >= thiz.start ||
+		thiz.end+1 == o.start || o.end+1 == thiz.start
 }
 
 func (thiz *rangeList) unionWith(o intRange) {
@@ -30,7 +24,7 @@ func (thiz *rangeList) unionWith(o intRange) {
 		var merged bool
 		for i := 0; i < len(res); i++ {
 			r := &res[i]
-			if r.sizeOfOverlapWith(e) > 0 || r.isAdjacentTo(e) {
+			if r.overlapsWithOrIsAdjacentTo(e) {
 				res[i].start = min(e.start, r.start)
 				res[i].end = max(e.end, r.end)
 				merged = true
