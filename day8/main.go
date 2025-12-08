@@ -3,58 +3,26 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"container/heap"
 	"fmt"
 	"os"
+	"slices"
 )
 
-type coordinate struct {
+type junctionBox struct {
 	x, y, z uint64
 	circuit *circuit
 }
 
 type pair struct {
-	a, b *coordinate
+	a, b *junctionBox
 	dist uint64
-}
-
-type pairs []pair
-
-func (p *pairs) Len() int           { return len(*p) }
-func (p *pairs) Swap(i, j int)      { (*p)[i], (*p)[j] = (*p)[j], (*p)[i] }
-func (p *pairs) Less(i, j int) bool { return (*p)[i].dist < (*p)[j].dist }
-func (p *pairs) Push(x interface{}) {
-	*p = append(*p, x.(pair))
-}
-func (p *pairs) Pop() interface{} {
-	old := *p
-	n := len(old)
-	x := old[n-1]
-	*p = old[0 : n-1]
-	return x
 }
 
 type circuit struct {
 	size uint64
 }
 
-type circuits []*circuit
-
-func (c *circuits) Len() int           { return len(*c) }
-func (c *circuits) Swap(i, j int)      { (*c)[i], (*c)[j] = (*c)[j], (*c)[i] }
-func (c *circuits) Less(i, j int) bool { return (*c)[i].size > (*c)[j].size }
-func (c *circuits) Push(x interface{}) {
-	*c = append(*c, x.(*circuit))
-}
-func (c *circuits) Pop() interface{} {
-	old := *c
-	n := len(old)
-	x := old[n-1]
-	*c = old[0 : n-1]
-	return x
-}
-
-func manhattanDistance(a, b coordinate) uint64 {
+func manhattanDistance(a, b junctionBox) uint64 {
 	dx := a.x - b.x
 	dy := a.y - b.y
 	dz := a.z - b.z
@@ -64,29 +32,25 @@ func manhattanDistance(a, b coordinate) uint64 {
 func main() {
 	data, _ := os.ReadFile("input.txt")
 	scanner := bufio.NewScanner(bytes.NewReader(data))
-	var coords []*coordinate
+	var coords []*junctionBox
 	for scanner.Scan() {
-		var c coordinate
+		var c junctionBox
 		_, _ = fmt.Sscanf(scanner.Text(), "%d,%d,%d", &c.x, &c.y, &c.z)
 		coords = append(coords, &c)
 	}
-	var ps pairs
+	var ps []pair
 	for i := 0; i < len(coords); i++ {
 		for j := i + 1; j < len(coords); j++ {
-			ps = append(ps, pair{
-				a:    coords[i],
-				b:    coords[j],
-				dist: manhattanDistance(*coords[i], *coords[j]),
-			})
+			ps = append(ps, pair{a: coords[i], b: coords[j], dist: manhattanDistance(*coords[i], *coords[j])})
 		}
 	}
-	heap.Init(&ps)
-	var orderedCircuits circuits
-	connections := 0
+	slices.SortFunc(ps, func(a, b pair) int {
+		return int(a.dist) - int(b.dist)
+	})
+	var orderedCircuits []*circuit
 	var lastPair *pair
-	for ps.Len() > 0 {
-		p := heap.Pop(&ps).(pair)
-		connections++
+	for i := 0; i < len(ps); i++ {
+		p := ps[i]
 		if p.a.circuit != nil && p.a.circuit == p.b.circuit {
 			continue
 		}
@@ -120,21 +84,17 @@ func main() {
 			}
 		}
 
-		if connections == 1000 {
-			heap.Init(&orderedCircuits)
-			var largestSizes []uint64
-			for i := 0; i < 3 && orderedCircuits.Len() > 0; i++ {
-				circuit := heap.Pop(&orderedCircuits).(*circuit)
-				largestSizes = append(largestSizes, circuit.size)
-			}
+		if i == 999 {
+			slices.SortFunc(orderedCircuits, func(a, b *circuit) int {
+				return int(b.size) - int(a.size)
+			})
 			product := uint64(1)
-			for _, size := range largestSizes {
-				product *= size
+			for i := 0; i < 3 && i < len(orderedCircuits); i++ {
+				product *= orderedCircuits[i].size
 			}
-			fmt.Printf("Product of largest circuit sizes: %d\n", product)
+			println(product)
 		}
 	}
 
-	xProduct := lastPair.a.x * lastPair.b.x
-	fmt.Printf("Product of X coordinates of last connected pair: %d\n", xProduct)
+	println(lastPair.a.x * lastPair.b.x)
 }
